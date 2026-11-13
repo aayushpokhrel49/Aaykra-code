@@ -167,6 +167,8 @@ impl GlobalArgs {
 pub enum Command {
     /// Run one prompt headlessly (no TUI).
     Run(RunArgs),
+    /// Open the interactive TUI (default when stdin/stdout are terminals).
+    Tui(TuiArgs),
     /// List configured providers and models.
     Models(ModelsArgs),
     /// List, inspect, rename, or delete sessions.
@@ -196,6 +198,17 @@ pub enum Command {
 #[derive(Debug, Args)]
 pub struct RunArgs {
     /// Prompt. If omitted and stdin is piped, stdin is used.
+    #[arg(
+        value_name = "PROMPT",
+        trailing_var_arg = true,
+        allow_hyphen_values = true
+    )]
+    pub prompt: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct TuiArgs {
+    /// Optional prompt to send immediately after the interface opens.
     #[arg(
         value_name = "PROMPT",
         trailing_var_arg = true,
@@ -385,11 +398,24 @@ pub async fn run() -> i32 {
 }
 
 /// Entry point for the `aaykra` binary: `aaykra agent …` behaves like
-/// `aaykra-code …`, and other arguments are passed through unchanged.
+/// `aaykra-code …`, and `aaykra code …` / `aaykra tui …` open the TUI
+/// directly.
 pub async fn run_aaykra_alias() -> i32 {
     let mut args: Vec<std::ffi::OsString> = std::env::args_os().collect();
-    if args.get(1).and_then(|arg| arg.to_str()) == Some("agent") {
-        args.remove(1);
+    if let Some(arg) = args.get(1).and_then(|arg| arg.to_str()) {
+        match arg {
+            "agent" => {
+                args.remove(1);
+            }
+            "code" | "tui" => {
+                if args.len() == 2 {
+                    args.push("tui".into());
+                } else {
+                    args[1] = "tui".into();
+                }
+            }
+            _ => {}
+        }
     }
     let cli = Cli::parse_from(args);
     match dispatch(cli).await {
@@ -408,6 +434,7 @@ pub async fn run_aaykra_alias() -> i32 {
 async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Some(Command::Run(args)) => run_command(cli.global, args).await,
+        Some(Command::Tui(args)) => interactive_command(cli.global, args.prompt, true).await,
         Some(Command::Models(args)) => models_command(cli.global, args).await,
         Some(Command::Sessions(args)) => sessions_command(cli.global, args),
         Some(Command::Auth(args)) => auth_command(args),
@@ -420,7 +447,7 @@ async fn dispatch(cli: Cli) -> Result<()> {
         Some(Command::Review(args)) => review_command(cli.global, args).await,
         Some(Command::Doctor(args)) => doctor_command(cli.global, args).await,
         Some(Command::Config(args)) => config_command(cli.global, args),
-        None => interactive_command(cli.global, cli.prompt).await,
+        None => interactive_command(cli.global, cli.prompt, false).await,
     }
 }
 
@@ -428,49 +455,105 @@ async fn dispatch(cli: Cli) -> Result<()> {
 // Interactive and headless entry
 // ---------------------------------------------------------------------------
 
-async fn interactive_command(global: GlobalArgs, prompt: Vec<String>) -> Result<()> {
+async fn interactive_command(
+    global: GlobalArgs,
+    prompt: Vec<String>,
+    force_tui: bool,
+) -> Result<()> {
     let services = load_services(&global)?;
-    let session = prepare_session(&services, &global, None)?;
-    print_warnings(&services, &global);
     let prompt = prompt.join(" ").trim().to_string();
     let images = load_images(&global)?;
-    let interactive = !global.print
-        && !global.no_tui
-        && std::io::stdin().is_terminal()
-        && std::io::stdout().is_terminal();
+    let interactive = force_tui
+        || (!global.print
+            && !global.no_tui
+            && std::io::stdin().is_terminal()
+            && std::io::stdout().is_terminal());
 
-    if interactive {
-        if session.messages.is_empty() {
-            println!(
-                "Aaykra Code · {}/{} · mode {}",
-                session.provider,
-                session.model,
-                session.permission_mode.label()
-            );
-        }
-        return crate::tui::run(services, session, prompt, images).await;
+    if !interactive {
+        let session = prepare_session(&services, &global, None)?;
+        print_warnings(&services, &global);
+        let prompt = if prompt.is_empty() {
+            read_stdin_prompt()?
+        } else {
+            prompt
+        };
+        return execute_headless(
+            services,
+            session,
+            prompt,
+            images,
+            HeadlessOptions {
+                format: global.output_format,
+                auto_approve: global.yes,
+                show_thinking: false,
+                show_tool_output: false,
+                quiet: global.quiet,
+            },
+            global.max_turns,
+        )
+        .await;
     }
 
-    let prompt = if prompt.is_empty() {
-        read_stdin_prompt()?
-    } else {
-        prompt
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        bail!("the TUI needs an interactive terminal; use `akc run …` for headless use");
+    }
+
+    // Build the session, but if it fails because nothing is configured (no
+    // credentials, no model), let the in-app setup flow fix it first.
+    let session = match prepare_session(&services, &global, None) {
+        Ok(session) => Some(session),
+        Err(error) => {
+            if is_fresh_install(&services) {
+                None
+            } else {
+                return Err(error);
+            }
+        }
     };
-    execute_headless(
+    if let Some(session) = &session
+        && session.messages.is_empty()
+    {
+        println!(
+            "Aaykra Code · {}/{} · mode {}",
+            session.provider,
+            session.model,
+            session.permission_mode.label()
+        );
+    }
+    let mode = if global.dangerously_skip_permissions {
+        Some(PermissionMode::Bypass)
+    } else {
+        global.permission_mode
+    };
+    crate::tui::run(
         services,
         session,
         prompt,
         images,
-        HeadlessOptions {
-            format: global.output_format,
-            auto_approve: global.yes,
-            show_thinking: false,
-            show_tool_output: false,
-            quiet: global.quiet,
+        crate::tui::setup::SetupContext {
+            config_path: global.config.clone(),
+            overrides: global.config_overrides(),
+            agent: global.agent.clone(),
+            mode,
+            name: global.name.clone(),
         },
-        global.max_turns,
     )
     .await
+}
+
+/// True on a first run: no config files were loaded, no credential store
+/// exists, and no provider API key is set anywhere.
+fn is_fresh_install(services: &Services) -> bool {
+    if !services.config_files.is_empty() || services.paths.credentials().exists() {
+        return false;
+    }
+    !services.config.enabled_providers().any(|(name, provider)| {
+        provider.requires_key
+            && crate::auth::resolve_api_key(&services.config, name, provider, &services.paths)
+                .ok()
+                .flatten()
+                .is_some()
+    })
 }
 
 async fn run_command(global: GlobalArgs, args: RunArgs) -> Result<()> {

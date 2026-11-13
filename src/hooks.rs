@@ -295,9 +295,12 @@ async fn run_command_hook(
     for (key, value) in context.env(kind) {
         command.env(key, value);
     }
-    let mut child = command
-        .spawn()
-        .map_err(|error| anyhow::anyhow!("could not spawn hook: {error}"))?;
+    let mut child = spawn_hook(&mut command).or_else(|error| {
+        // Under heavy load a process spawn can transiently fail
+        // (e.g. EMFILE); retry once before reporting.
+        std::thread::sleep(Duration::from_millis(50));
+        spawn_hook(&mut command).map_err(|_| error)
+    })?;
     if let Some(mut stdin) = child.stdin.take() {
         let payload = context.payload(kind).to_string();
         stdin.write_all(payload.as_bytes()).await.ok();
@@ -322,6 +325,12 @@ async fn run_command_hook(
             anyhow::bail!("timed out after {}ms", timeout.as_millis())
         }
     }
+}
+
+fn spawn_hook(command: &mut Command) -> anyhow::Result<tokio::process::Child> {
+    command
+        .spawn()
+        .map_err(|error| anyhow::anyhow!("could not spawn hook: {error}"))
 }
 
 fn truncate(value: &str, max: usize) -> String {

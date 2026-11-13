@@ -52,7 +52,7 @@ The package installs four equivalent entry points:
 | `aaykra-code` | Canonical executable |
 | `akc` | Short alias |
 | `aaykra-agent` | Explicit agent alias |
-| `aaykra` | Supports `aaykra agent …` |
+| `aaykra` | Supports `aaykra agent …`, `aaykra code …`, `aaykra tui …` |
 
 ## Quick start
 
@@ -67,8 +67,15 @@ export ANTHROPIC_API_KEY=sk-ant-...
 akc doctor                 # verify providers, tools, git, and sandbox support
 akc init                   # write project config, AAYKRA.md, agent/skill dirs
 akc                        # open the interactive TUI
+akc tui                    # same, explicit
+aaykra code                # same, from the aaykra alias
 akc "explain this codebase"
 ```
+
+> On a fresh machine with no credentials, the TUI opens an in-app setup
+> screen first: pick a provider, paste a masked API key (stored in
+> `~/.aaykra/credentials.toml`, mode 0600), or register a custom
+> OpenAI-compatible endpoint — no shell commands needed.
 
 Pick a provider or model explicitly:
 
@@ -84,7 +91,9 @@ akc --model ollama/qwen3-coder
 
 Run `akc` in a terminal. The status line shows the active model, permission
 mode, token usage, cost, context pressure, and turn state. The sidebar surfaces
-context pressure, todos, changed files, and session state.
+context pressure, todos, changed files, and session state. When the active
+provider needs credentials that are not configured, a setup screen is shown
+before the main interface.
 
 | Key | Action |
 | --- | --- |
@@ -94,6 +103,7 @@ context pressure, todos, changed files, and session state.
 | `Ctrl+C` | Cancel the running turn (press `Ctrl+D` to quit) |
 | `Ctrl+D` | Quit |
 | `Ctrl+O` | Expand/collapse tool output |
+| `Ctrl+T` | Toggle thinking visibility |
 | `Ctrl+V` | Attach an image from the clipboard |
 | `PageUp` / `PageDown` | Scroll the transcript |
 | `Esc` | Cancel the running turn |

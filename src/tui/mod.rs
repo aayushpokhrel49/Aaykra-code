@@ -2,6 +2,7 @@
 
 mod app;
 mod render;
+pub(super) mod setup;
 
 use std::io::{Stdout, stdout};
 use std::sync::Arc;
@@ -94,7 +95,7 @@ pub(super) struct Theme {
 }
 
 impl Theme {
-    fn from_name(name: &str) -> Self {
+    pub(super) fn from_name(name: &str) -> Self {
         use ratatui::style::Color;
         match name.trim().to_ascii_lowercase().as_str() {
             "amber" | "warm" => Self {
@@ -140,7 +141,7 @@ impl Theme {
     }
 }
 
-struct TerminalSession {
+pub(super) struct TerminalSession {
     terminal: Terminal<CrosstermBackend<Stdout>>,
     mouse: bool,
     keyboard_enhancement: bool,
@@ -189,18 +190,76 @@ impl Drop for TerminalSession {
 
 pub async fn run(
     services: Services,
-    session: Session,
+    session: Option<Session>,
     initial_prompt: String,
     initial_images: Vec<ImageAttachment>,
+    setup_ctx: setup::SetupContext,
 ) -> Result<()> {
-    let (tx, mut rx) = mpsc::unbounded_channel::<UiMessage>();
-    let gateway = Arc::new(TuiGateway { tx: tx.clone() });
     let theme = Theme::from_name(&services.config.ui.theme);
     let show_thinking = services.config.ui.show_thinking;
     let mouse = services.config.ui.mouse;
-    let runtime = services.runtime(session, gateway);
 
     let mut terminal = TerminalSession::start(mouse)?;
+
+    // Provider onboarding: shown when the resolved provider needs a key that
+    // is not configured anywhere, or when a session could not be built at
+    // all (fresh install with no credentials).
+    let needs_onboarding = session
+        .as_ref()
+        .is_none_or(|session| needs_setup(&services, session));
+    let (services, session) = if needs_onboarding {
+        match setup::run(&mut terminal, &services, session.as_ref(), &setup_ctx).await? {
+            Some(outcome) if !outcome.provider.is_empty() => {
+                let mut services = services;
+                if outcome.reload_config {
+                    services = Services::load_with(
+                        services.cwd.clone(),
+                        setup_ctx.config_path.as_deref(),
+                        setup_ctx.overrides,
+                    )?;
+                }
+                let session = match session {
+                    Some(mut session) => {
+                        let resolved = crate::models::resolve_model(
+                            &services.config,
+                            Some(&outcome.model),
+                            Some(&outcome.provider),
+                        )?;
+                        session.set_model(resolved.reference.provider, resolved.reference.model);
+                        session
+                    }
+                    None => {
+                        let mut session = services.new_session(
+                            Some(&outcome.provider),
+                            Some(&outcome.model),
+                            setup_ctx.agent.as_deref(),
+                            setup_ctx.mode,
+                        )?;
+                        if let Some(name) = &setup_ctx.name {
+                            session.set_name(Some(name.clone()))?;
+                        }
+                        session
+                    }
+                };
+                let _ = services.save(&session);
+                (services, session)
+            }
+            _ => {
+                drop(terminal);
+                return Ok(());
+            }
+        }
+    } else {
+        (
+            services,
+            session.expect("session present when onboarding is not needed"),
+        )
+    };
+
+    let (tx, mut rx) = mpsc::unbounded_channel::<UiMessage>();
+    let gateway = Arc::new(TuiGateway { tx: tx.clone() });
+    let runtime = services.runtime(session, gateway);
+
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<Event>();
     spawn_terminal_reader(event_tx);
 
@@ -218,6 +277,7 @@ pub async fn run(
             _ = ticker.tick() => app.tick(),
             else => break Ok(()),
         }
+        let _ = terminal.terminal.autoresize();
         if let Err(error) = terminal.terminal.draw(|frame| app.render(frame)) {
             break Err(anyhow::anyhow!("could not draw the interface: {error}"));
         }
@@ -235,7 +295,35 @@ pub async fn run(
     loop_result
 }
 
-fn spawn_terminal_reader(tx: mpsc::UnboundedSender<Event>) {
+/// True when the user should be offered provider onboarding:
+/// - the resolved provider needs API credentials that are missing, or
+/// - this looks like a first run (no config files, no credential store, and
+///   no provider key anywhere) — show setup even though a local provider
+///   would be chosen by default.
+fn needs_setup(services: &Services, session: &Session) -> bool {
+    let Some(config) = services.config.provider(&session.provider) else {
+        return false;
+    };
+    if config.requires_key && !services.provider_runtime.has_key(&session.provider) {
+        return true;
+    }
+    if !services.config_files.is_empty() || services.paths.credentials().exists() {
+        return false;
+    }
+    !any_cloud_key(services)
+}
+
+fn any_cloud_key(services: &Services) -> bool {
+    services.config.enabled_providers().any(|(name, provider)| {
+        provider.requires_key
+            && crate::auth::resolve_api_key(&services.config, name, provider, &services.paths)
+                .ok()
+                .flatten()
+                .is_some()
+    })
+}
+
+pub(super) fn spawn_terminal_reader(tx: mpsc::UnboundedSender<Event>) {
     std::thread::spawn(move || {
         loop {
             if tx.is_closed() {

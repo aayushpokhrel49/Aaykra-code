@@ -1331,14 +1331,19 @@ mod tests {
     #[test]
     fn context_handoff_keeps_recent_turns_and_remaps_undo_indices() {
         let mut session = Session::new("anthropic", "old-model", std::path::PathBuf::from("."));
-        for index in 0..4 {
+        // Turn 0 carries a large tool result — exactly the kind of history the
+        // handoff is meant to compress. Later turns are small.
+        session.begin_turn(Message::user_text("goal 0"));
+        session.push_message(Message::assistant_text("answer 0"));
+        session.push_message(Message::tool_result("call-0", "y".repeat(20_000), false));
+        for index in 1..4 {
             session.begin_turn(Message::user_text(format!("goal {index}")));
             session.push_message(Message::assistant_text(format!("answer {index}")));
         }
         let cutoff = handoff_cutoff(&session.messages).expect("cutoff");
-        assert_eq!(cutoff, 4, "the last two user turns should be kept");
+        assert_eq!(cutoff, 5, "the last two user turns should be kept");
         let (removed, saved) = apply_context_handoff(&mut session).expect("handoff");
-        assert_eq!(removed, 4);
+        assert_eq!(removed, 5);
         assert!(saved > 0);
         assert_eq!(session.messages.len(), 5);
         let digest = session.messages[0].text();

@@ -358,12 +358,19 @@ fn welcome_lines(theme: &Theme) -> Vec<Line<'static>> {
             ),
         ]),
         Line::from(vec![
+            Span::styled("  /model         ", Style::default().fg(theme.accent_alt)),
+            Span::styled(
+                "list models or switch provider/model",
+                Style::default().fg(theme.text),
+            ),
+        ]),
+        Line::from(vec![
             Span::styled("  /help          ", Style::default().fg(theme.accent_alt)),
             Span::styled("every command and key", Style::default().fg(theme.text)),
         ]),
         Line::default(),
         Line::from(Span::styled(
-            "  Shift+Tab cycles permission mode · Ctrl+V pastes an image · Ctrl+O expands tools",
+            "  Shift+Tab cycles permission mode · Ctrl+V pastes an image · Ctrl+O expands tools · Ctrl+T thinking",
             Style::default().fg(theme.muted),
         )),
     ]
@@ -803,6 +810,7 @@ fn render_input(frame: &mut Frame, area: Rect, app: &mut App) {
 
 fn render_status(frame: &mut Frame, area: Rect, app: &App) {
     let theme = &app.theme;
+    let narrow = area.width < 120;
     let percent = if app.context_limit == 0 {
         0.0
     } else {
@@ -818,7 +826,11 @@ fn render_status(frame: &mut Frame, area: Rect, app: &App) {
         ),
         Span::styled(" · ", Style::default().fg(theme.muted)),
         Span::styled(
-            format!("{}/{}", app.provider, truncate(&app.model, 28)),
+            format!(
+                "{}/{}",
+                app.provider,
+                truncate(&app.model, if narrow { 14 } else { 28 })
+            ),
             Style::default().fg(theme.text),
         ),
         Span::styled(" · ctx ", Style::default().fg(theme.muted)),
@@ -832,30 +844,34 @@ fn render_status(frame: &mut Frame, area: Rect, app: &App) {
                 theme.text
             }),
         ),
-        Span::styled(" · ", Style::default().fg(theme.muted)),
-        Span::styled(
-            format!(
-                "{} in / {} out",
-                compact_number(app.usage.input_tokens),
-                compact_number(app.usage.output_tokens)
-            ),
-            Style::default().fg(theme.text),
-        ),
-        Span::styled(" · ", Style::default().fg(theme.muted)),
-        Span::styled(
-            crate::models::format_cost(app.cost),
-            Style::default().fg(theme.text),
-        ),
-        Span::styled(" · ", Style::default().fg(theme.muted)),
-        Span::styled(
-            std::path::Path::new(&app.cwd)
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or(&app.cwd)
-                .to_string(),
-            Style::default().fg(theme.muted),
-        ),
     ];
+    if !narrow {
+        spans.extend([
+            Span::styled(" · ", Style::default().fg(theme.muted)),
+            Span::styled(
+                format!(
+                    "{} in / {} out",
+                    compact_number(app.usage.input_tokens),
+                    compact_number(app.usage.output_tokens)
+                ),
+                Style::default().fg(theme.text),
+            ),
+            Span::styled(" · ", Style::default().fg(theme.muted)),
+            Span::styled(
+                crate::models::format_cost(app.cost),
+                Style::default().fg(theme.text),
+            ),
+            Span::styled(" · ", Style::default().fg(theme.muted)),
+            Span::styled(
+                std::path::Path::new(&app.cwd)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or(&app.cwd)
+                    .to_string(),
+                Style::default().fg(theme.muted),
+            ),
+        ]);
+    }
     if let Some(started) = app.turn_started {
         spans.push(Span::styled(" · ", Style::default().fg(theme.muted)));
         spans.push(Span::styled(

@@ -82,6 +82,18 @@ fn models_json_lists_builtin_providers() {
 }
 
 #[test]
+fn tui_subcommand_is_documented() {
+    let output = Command::cargo_bin("akc")
+        .expect("akc binary")
+        .args(["tui", "--help"])
+        .output()
+        .expect("run tui --help");
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Open the interactive TUI"), "{stdout}");
+}
+
+#[test]
 fn doctor_json_reports_a_healthy_configuration() {
     let (mut command, home, _project) = isolated();
     let output = command

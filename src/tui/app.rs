@@ -717,6 +717,15 @@ impl App {
                     self.transcript.clear();
                     return;
                 }
+                KeyCode::Char('t') => {
+                    self.show_thinking = !self.show_thinking;
+                    self.set_notice(if self.show_thinking {
+                        "Thinking visible"
+                    } else {
+                        "Thinking hidden"
+                    });
+                    return;
+                }
                 KeyCode::Char('j') => {
                     self.input.newline();
                     return;
