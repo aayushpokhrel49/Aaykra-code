@@ -1,0 +1,109 @@
+# Aaykra Code — example configuration
+#
+# Copy the relevant sections into ~/.aaykra/config.toml or
+# .aaykra/config.toml. Project config overrides global config.
+
+default_provider = "anthropic"
+model = "anthropic/claude-sonnet-4-5"
+fallback_models = ["openai/gpt-5.1", "deepseek/deepseek-chat"]
+
+max_tokens = 8192
+max_turns = 100
+effort = "medium"              # off | low | medium | high | max
+permission_mode = "ask"        # ask | accept-edits | plan | auto | bypass
+default_agent = "general"
+auto_memory = true
+
+[permissions]
+allow = ["Read", "Glob", "Grep", "RepoMap", "Bash(git status)", "Bash(git diff:*)"]
+ask = ["Bash(git push:*)", "Write(src/**)", "Edit(src/**)"]
+deny = ["Bash(rm -rf /:*)", "Bash(curl * | sh:*)"]
+additional_directories = []
+
+[sandbox]
+mode = "auto"                  # off | auto | bubblewrap | seatbelt
+allow_network = true
+extra_writable = []
+extra_readonly = []
+
+[context]
+auto_compact = true
+compact_threshold = 0.82
+resume_handoff = true
+max_tool_output_chars = 60000
+max_tool_output_lines = 2000
+repo_map_files = 1500
+repo_map_cache_secs = 300
+auto_diagnostics = true
+deferred_mcp_tools = true
+
+[ui]
+show_thinking = false
+compact_tools = true
+mouse = true
+
+[web]
+search_provider = "duckduckgo" # duckduckgo | tavily | brave
+max_results = 8
+# tavily_api_key = "${TAVILY_API_KEY}"
+# brave_api_key = "${BRAVE_API_KEY}"
+
+[git]
+auto_commit = false
+commit_style = "conventional"
+create_pr = false
+protected_branches = ["main", "master"]
+
+[checkpoints]
+enabled = true
+keep_turns = 50
+
+[sessions]
+auto_save = true
+retention_days = 90
+
+# --- Providers -----------------------------------------------------------
+
+[providers.anthropic]
+default_model = "claude-sonnet-4-5"
+
+[providers.openai]
+default_model = "gpt-5.1"
+
+[providers.deepseek]
+default_model = "deepseek-chat"
+
+# A local OpenAI-compatible server that needs no API key.
+[providers.ollama]
+base_url = "http://localhost:11434/v1"
+default_model = "qwen2.5-coder:7b"
+requires_key = false
+
+# --- MCP -----------------------------------------------------------------
+
+# [mcp.filesystem]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "."]
+# timeout_ms = 20000
+
+# [mcp.remote]
+# url = "https://mcp.example.com/mcp"
+# headers = { Authorization = "Bearer ${MCP_TOKEN}" }
+
+# --- LSP -----------------------------------------------------------------
+
+# [lsp.rust]
+# command = "rust-analyzer"
+# extensions = ["rs"]
+#
+# [lsp.python]
+# command = "pylsp"
+# extensions = ["py"]
+
+# --- Hooks ---------------------------------------------------------------
+
+# [[hooks.pre_tool_use]]
+# command = "scripts/check-tool.sh"
+# matcher = "Bash|Write|Edit"
+# timeout_ms = 30000
+# blocking = true

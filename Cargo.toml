@@ -1,0 +1,106 @@
+[package]
+name = "aaykra-code"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Aaykra Code — a fast, native, fully agentic coding agent in pure Rust"
+license = "Apache-2.0"
+repository = "https://github.com/aaykra/aaykra-code"
+homepage = "https://aaykra.dev"
+readme = "README.md"
+keywords = ["agent", "coding", "ai", "cli", "tui"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "aaykra"
+path = "src/lib.rs"
+
+[[bin]]
+name = "aaykra-code"
+path = "src/main.rs"
+
+[[bin]]
+name = "akc"
+path = "src/bin/akc.rs"
+
+[[bin]]
+name = "aaykra-agent"
+path = "src/bin/aaykra-agent.rs"
+
+[[bin]]
+name = "aaykra"
+path = "src/bin/aaykra.rs"
+
+[dependencies]
+anyhow = "1.0"
+async-stream = "0.3"
+async-trait = "0.1"
+axum = { version = "0.8", default-features = false, features = ["json", "query", "tokio", "http1"] }
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
+crossterm = "0.28"
+dirs = "6"
+futures-util = "0.3"
+globset = "0.4"
+hex = "0.4"
+html2text = "0.17"
+ignore = "0.4"
+indexmap = { version = "2", features = ["serde"] }
+mime_guess = "2"
+nix = { version = "0.30", features = ["signal", "process"], default-features = false }
+ratatui = { version = "0.29", features = ["unstable-rendered-line-info"] }
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "charset", "http2"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+similar = "2"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tree-sitter = "0.25"
+tree-sitter-bash = "0.25"
+tree-sitter-go = "0.25"
+tree-sitter-javascript = "0.25"
+tree-sitter-json = "0.24"
+tree-sitter-python = "0.25"
+tree-sitter-rust = "0.24"
+tree-sitter-typescript = "0.23"
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+walkdir = "2"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tokio-test = "0.4"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+opt-level = 3
+
+[profile.dev]
+opt-level = 1
+debug = 1
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+too_many_lines = "allow"
+struct_excessive_bools = "allow"
