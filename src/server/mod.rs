@@ -830,7 +830,7 @@ async fn create_session(
     Ok((StatusCode::CREATED, Json(session)))
 }
 
-async fn resolve_session(state: &AppState, reference: &str) -> Result<Session, ApiError> {
+fn resolve_session(state: &AppState, reference: &str) -> Result<Session, ApiError> {
     state
         .services
         .store
@@ -842,7 +842,7 @@ async fn get_session(
     State(state): State<AppState>,
     AxumPath(reference): AxumPath<String>,
 ) -> Result<Json<Session>, ApiError> {
-    Ok(Json(resolve_session(&state, &reference).await?))
+    Ok(Json(resolve_session(&state, &reference)?))
 }
 
 async fn update_session(
@@ -850,7 +850,7 @@ async fn update_session(
     AxumPath(reference): AxumPath<String>,
     Json(request): Json<UpdateSessionRequest>,
 ) -> Result<Json<Session>, ApiError> {
-    let resolved = resolve_session(&state, &reference).await?;
+    let resolved = resolve_session(&state, &reference)?;
     let _active = state.activate(&resolved.id, CancellationToken::new())?;
     let mut session = state.services.store.load(&resolved.id)?;
     state
@@ -876,7 +876,7 @@ async fn delete_session(
     State(state): State<AppState>,
     AxumPath(reference): AxumPath<String>,
 ) -> Result<StatusCode, ApiError> {
-    let session = resolve_session(&state, &reference).await?;
+    let session = resolve_session(&state, &reference)?;
     let _active = state.activate(&session.id, CancellationToken::new())?;
     state.services.store.delete(&session.id)?;
     Ok(StatusCode::NO_CONTENT)
@@ -887,7 +887,7 @@ async fn fork_session(
     AxumPath(reference): AxumPath<String>,
     Json(request): Json<ForkSessionRequest>,
 ) -> Result<(StatusCode, Json<Session>), ApiError> {
-    let source = resolve_session(&state, &reference).await?;
+    let source = resolve_session(&state, &reference)?;
     let _active = state.activate(&source.id, CancellationToken::new())?;
     let mut forked = source.fork();
     if let Some(name) = &request.name {
@@ -904,7 +904,7 @@ async fn start_turn(
     AxumPath(reference): AxumPath<String>,
     Json(request): Json<TurnRequest>,
 ) -> Result<Response, ApiError> {
-    let session = resolve_session(&state, &reference).await?;
+    let session = resolve_session(&state, &reference)?;
     let cancel = CancellationToken::new();
     let active = state.activate(&session.id, cancel.clone())?;
 
@@ -1202,7 +1202,7 @@ async fn cancel_turn(
     State(state): State<AppState>,
     AxumPath(reference): AxumPath<String>,
 ) -> Result<Json<Value>, ApiError> {
-    let session = resolve_session(&state, &reference).await?;
+    let session = resolve_session(&state, &reference)?;
     let Some(cancel) = state.cancel_token(&session.id) else {
         return Err(ApiError::conflict(format!(
             "session `{}` has no active turn",
@@ -1220,7 +1220,7 @@ async fn undo_turn(
     State(state): State<AppState>,
     AxumPath(reference): AxumPath<String>,
 ) -> Result<Json<Value>, ApiError> {
-    let resolved = resolve_session(&state, &reference).await?;
+    let resolved = resolve_session(&state, &reference)?;
     let _active = state.activate(&resolved.id, CancellationToken::new())?;
     let mut session = state.services.store.load(&resolved.id)?;
     let checkpointer = Checkpointer::new(

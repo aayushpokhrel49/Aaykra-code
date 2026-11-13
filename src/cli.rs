@@ -409,17 +409,17 @@ async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Some(Command::Run(args)) => run_command(cli.global, args).await,
         Some(Command::Models(args)) => models_command(cli.global, args).await,
-        Some(Command::Sessions(args)) => sessions_command(cli.global, args).await,
-        Some(Command::Auth(args)) => auth_command(args).await,
+        Some(Command::Sessions(args)) => sessions_command(cli.global, args),
+        Some(Command::Auth(args)) => auth_command(args),
         Some(Command::Mcp(args)) => mcp_command(cli.global, args).await,
-        Some(Command::Agents(args)) => agents_command(cli.global, args).await,
-        Some(Command::Skills(args)) => skills_command(cli.global, args).await,
+        Some(Command::Agents(args)) => agents_command(cli.global, args),
+        Some(Command::Skills(args)) => skills_command(cli.global, args),
         Some(Command::Serve(args)) => serve_command(cli.global, args).await,
-        Some(Command::Init(args)) => init_command(cli.global, args).await,
+        Some(Command::Init(args)) => init_command(cli.global, args),
         Some(Command::Diff(args)) => diff_command(cli.global, args).await,
         Some(Command::Review(args)) => review_command(cli.global, args).await,
         Some(Command::Doctor(args)) => doctor_command(cli.global, args).await,
-        Some(Command::Config(args)) => config_command(cli.global, args).await,
+        Some(Command::Config(args)) => config_command(cli.global, args),
         None => interactive_command(cli.global, cli.prompt).await,
     }
 }
@@ -743,7 +743,7 @@ async fn models_command(global: GlobalArgs, args: ModelsArgs) -> Result<()> {
     Ok(())
 }
 
-async fn sessions_command(global: GlobalArgs, args: SessionsArgs) -> Result<()> {
+fn sessions_command(global: GlobalArgs, args: SessionsArgs) -> Result<()> {
     let services = load_services(&global)?;
     match args.action.unwrap_or(SessionsAction::List {
         limit: 20,
@@ -802,7 +802,7 @@ async fn sessions_command(global: GlobalArgs, args: SessionsArgs) -> Result<()> 
     Ok(())
 }
 
-async fn auth_command(args: AuthArgs) -> Result<()> {
+fn auth_command(args: AuthArgs) -> Result<()> {
     let paths = AaykraPaths::discover()?;
     match args.action {
         AuthAction::Set { provider, key } => {
@@ -885,7 +885,7 @@ async fn mcp_command(global: GlobalArgs, args: McpArgs) -> Result<()> {
     Ok(())
 }
 
-async fn agents_command(global: GlobalArgs, args: CatalogArgs) -> Result<()> {
+fn agents_command(global: GlobalArgs, args: CatalogArgs) -> Result<()> {
     let services = load_services(&global)?;
     if let Some(name) = args.name {
         let Some(agent) = services.agents.get(&name) else {
@@ -938,7 +938,7 @@ async fn agents_command(global: GlobalArgs, args: CatalogArgs) -> Result<()> {
     Ok(())
 }
 
-async fn skills_command(global: GlobalArgs, args: CatalogArgs) -> Result<()> {
+fn skills_command(global: GlobalArgs, args: CatalogArgs) -> Result<()> {
     let services = load_services(&global)?;
     if let Some(name) = args.name {
         let name = name.trim_start_matches('/');
@@ -976,7 +976,7 @@ async fn serve_command(global: GlobalArgs, args: ServeArgs) -> Result<()> {
     crate::server::serve(services, options).await
 }
 
-async fn init_command(global: GlobalArgs, args: InitArgs) -> Result<()> {
+fn init_command(global: GlobalArgs, args: InitArgs) -> Result<()> {
     let cwd = global.cwd()?;
     let paths = AaykraPaths::discover()?;
     let config_path = if args.global {
@@ -1299,7 +1299,7 @@ async fn doctor_command(global: GlobalArgs, args: DoctorArgs) -> Result<()> {
     Ok(())
 }
 
-async fn config_command(global: GlobalArgs, args: ConfigArgs) -> Result<()> {
+fn config_command(global: GlobalArgs, args: ConfigArgs) -> Result<()> {
     match args.action.unwrap_or(ConfigAction::Show) {
         ConfigAction::Path => {
             let cwd = global.cwd()?;

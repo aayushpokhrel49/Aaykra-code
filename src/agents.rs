@@ -122,7 +122,7 @@ impl AgentRegistry {
         for agent in self.agents.values() {
             let mode = agent
                 .permission_mode
-                .map(|mode| mode.label())
+                .map(PermissionMode::label)
                 .unwrap_or("inherit");
             lines.push(format!(
                 "  {:<18} {:<52} {:<14} [{}]",

@@ -4,7 +4,7 @@
 //! needs, without depending on the main crate. In a real editor you would map
 //! these events to transcript blocks, diff views, and permission dialogs.
 
-use std::io::Read;
+use std::io::{Read, Write};
 
 use anyhow::{Context, Result, bail};
 use futures_util::StreamExt;
@@ -45,28 +45,25 @@ async fn main() -> Result<()> {
     let server = server.trim_end_matches('/').to_string();
     let client = reqwest::Client::new();
 
-    let session = match session_reference {
-        Some(reference) => {
-            let response = request(
-                client.get(format!("{server}/v1/sessions/{reference}")),
-                token.as_deref(),
-            )
-            .send()
-            .await
-            .context("could not load session")?;
-            json_response(response).await?
-        }
-        None => {
-            let response = request(
-                client.post(format!("{server}/v1/sessions")),
-                token.as_deref(),
-            )
-            .json(&json!({"name": "editor"}))
-            .send()
-            .await
-            .context("could not create session")?;
-            json_response(response).await?
-        }
+    let session = if let Some(reference) = session_reference {
+        let response = request(
+            client.get(format!("{server}/v1/sessions/{reference}")),
+            token.as_deref(),
+        )
+        .send()
+        .await
+        .context("could not load session")?;
+        json_response(response).await?
+    } else {
+        let response = request(
+            client.post(format!("{server}/v1/sessions")),
+            token.as_deref(),
+        )
+        .json(&json!({"name": "editor"}))
+        .send()
+        .await
+        .context("could not create session")?;
+        json_response(response).await?
     };
     let session_id = session["id"]
         .as_str()
@@ -132,6 +129,7 @@ async fn json_response(response: reqwest::Response) -> Result<Value> {
 }
 
 /// Returns true when the final result event was received.
+#[allow(clippy::too_many_lines)]
 async fn handle_frame(
     frame: String,
     client: &reqwest::Client,
@@ -159,10 +157,8 @@ async fn handle_frame(
     match event.as_str() {
         "text_delta" => {
             print!("{}", payload["text"].as_str().unwrap_or_default());
-            use std::io::Write as _;
             std::io::stdout().flush().ok();
         }
-        "thinking_delta" => {}
         "tool_started" => {
             eprintln!("\n→ {} {}", payload["name"].as_str().unwrap_or("?"), payload["input"]);
         }

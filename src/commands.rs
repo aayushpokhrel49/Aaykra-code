@@ -61,7 +61,7 @@ pub async fn handle(runtime: Arc<Runtime>, input: &str) -> CommandAction {
         "quit" | "exit" | "q" => CommandAction::Quit,
         "clear" => clear(&runtime).await,
         "model" => model(&runtime, args).await,
-        "plan" => plan(&runtime, args).await,
+        "plan" => plan(&runtime, args),
         "compact" => compact(&runtime).await,
         "context" | "tokens" => CommandAction::reply(context_report(&runtime).await),
         "mcp" => mcp(&runtime, args).await,
@@ -244,7 +244,7 @@ fn parse_model_selector<'a>(runtime: &Runtime, args: &'a str) -> (Option<String>
     (None, args)
 }
 
-async fn plan(runtime: &Arc<Runtime>, args: &str) -> CommandAction {
+fn plan(runtime: &Arc<Runtime>, args: &str) -> CommandAction {
     let current = runtime.permissions.mode();
     let target = match args.to_ascii_lowercase().as_str() {
         "" => {

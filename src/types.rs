@@ -213,11 +213,12 @@ pub fn compact_number(n: u64) -> String {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 #[value(rename_all = "kebab-case")]
 pub enum PermissionMode {
     /// Ask before every side effect. The safe default.
+    #[default]
     Ask,
     /// Automatically accept file edits inside the project.
     AcceptEdits,
@@ -261,12 +262,6 @@ impl PermissionMode {
             Self::Auto => Self::Bypass,
             Self::Bypass => Self::Ask,
         }
-    }
-}
-
-impl Default for PermissionMode {
-    fn default() -> Self {
-        Self::Ask
     }
 }
 
@@ -602,19 +597,14 @@ pub trait UiGateway: Send + Sync {
     fn emit(&self, event: AgentEvent);
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 #[value(rename_all = "kebab-case")]
 pub enum OutputFormat {
+    #[default]
     Text,
     Json,
     StreamJson,
-}
-
-impl Default for OutputFormat {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

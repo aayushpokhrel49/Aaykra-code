@@ -59,7 +59,7 @@ impl HookKind {
 
     fn normalized_key(key: &str) -> String {
         key.chars()
-            .filter(|c| c.is_ascii_alphanumeric())
+            .filter(char::is_ascii_alphanumeric)
             .flat_map(char::to_lowercase)
             .collect()
     }

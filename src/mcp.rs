@@ -170,7 +170,7 @@ impl McpManager {
                         .extend(resources.into_iter().map(|mut resource| {
                             resource.server = name.clone();
                             resource
-                        }))
+                        }));
                 }
                 Err(error) => discovery
                     .warnings
@@ -347,7 +347,6 @@ impl McpClient {
         let transport: Arc<dyn McpTransport> = if let Some(command) = &config.command {
             Arc::new(
                 StdioTransport::spawn(command, &config.args, &config.env, cwd)
-                    .await
                     .context("failed to start stdio MCP server")?,
             )
         } else if let Some(url) = &config.url {
@@ -509,7 +508,7 @@ struct StdioTransport {
 }
 
 impl StdioTransport {
-    async fn spawn(
+    fn spawn(
         command: &str,
         args: &[String],
         env: &IndexMap<String, String>,

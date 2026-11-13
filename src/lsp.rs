@@ -221,7 +221,7 @@ impl LspManager {
 
 struct LspClient {
     _name: String,
-    _child: Mutex<Child>,
+    child: Mutex<Child>,
     stdin: Arc<Mutex<ChildStdin>>,
     pending: Arc<Mutex<HashMap<i64, oneshot::Sender<Result<Value, String>>>>>,
     next_id: AtomicI64,
@@ -267,7 +267,7 @@ impl LspClient {
 
         let client = Self {
             _name: name.to_string(),
-            _child: Mutex::new(child),
+            child: Mutex::new(child),
             stdin,
             pending,
             next_id: AtomicI64::new(1),
@@ -431,11 +431,7 @@ impl LspClient {
         let line_index = line.saturating_sub(1) as usize;
         let line_text = text.lines().nth(line_index).unwrap_or("");
         let col_index = column.saturating_sub(1) as usize;
-        let utf16_column: usize = line_text
-            .chars()
-            .take(col_index)
-            .map(|ch| ch.len_utf16())
-            .sum();
+        let utf16_column: usize = line_text.chars().take(col_index).map(char::len_utf16).sum();
         Ok((
             uri,
             json!({
@@ -469,7 +465,7 @@ impl LspClient {
         if let Some(handle) = self.reader.lock().await.take() {
             handle.abort();
         }
-        if let Ok(mut child) = self._child.try_lock() {
+        if let Ok(mut child) = self.child.try_lock() {
             child.start_kill().ok();
         }
     }

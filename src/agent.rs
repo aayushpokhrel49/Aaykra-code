@@ -837,7 +837,7 @@ async fn maybe_compact(runtime: &Arc<Runtime>) -> Result<Option<(Usage, f64)>> {
         let session = runtime.session.lock().await;
         (session.estimated_context_tokens(), runtime.context_limit())
     };
-    let threshold = (runtime.config.context.compact_threshold as f64).clamp(0.2, 0.95);
+    let threshold = f64::from(runtime.config.context.compact_threshold).clamp(0.2, 0.95);
     if limit == 0 || (estimated as f64) < limit as f64 * threshold {
         return Ok(None);
     }
